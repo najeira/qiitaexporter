@@ -24,6 +24,8 @@ var (
 	flagTmplFile      = flag.String("template", "", "template file")
 
 	imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
+	imgRegexp2 = regexp.MustCompile(`https://qiita-user-contents\.imgix\.net/https%3A%2F%2Fqiita-image-store\.s3\.amazonaws\.com.+`)
+
 	quoteReplacer = strings.NewReplacer("\"", "\\\"")
 )
 
@@ -60,38 +62,44 @@ func (item *Item) ImageToLocal(dir string) error {
 		rerr  error
 		count int
 	)
-	body := imgRegexp.ReplaceAllStringFunc(item.Body, func(s string) string {
+
+	// qiita-user-contents.imgix.netのほうを先にダウンロードする
+	body := imgRegexp2.ReplaceAllStringFunc(item.Body, func(s string) string {
 		if rerr != nil {
 			return s
 		}
 
 		count++
-		ext := path.Ext(s)
-		fname := fmt.Sprintf("qiita-%s-%d%s", item.ID, count, ext)
-		f, err := os.Create(filepath.Join(dir, fname))
+
+		s, err := imageName(imageNameParam{
+			itemID: item.ID,
+			dir:    dir,
+			count:  count,
+			name:   s,
+		})
 		if err != nil {
 			rerr = err
+		}
+		return s
+	})
+
+	body = imgRegexp.ReplaceAllStringFunc(body, func(s string) string {
+		if rerr != nil {
 			return s
 		}
 
-		resp, err := http.Get(s)
+		count++
+
+		s, err := imageName(imageNameParam{
+			itemID: item.ID,
+			dir:    dir,
+			count:  count,
+			name:   s,
+		})
 		if err != nil {
 			rerr = err
-			return s
 		}
-		defer resp.Body.Close()
-
-		if _, err := io.Copy(f, resp.Body); err != nil {
-			rerr = err
-			return s
-		}
-
-		if err := f.Close(); err != nil {
-			rerr = err
-			return s
-		}
-
-		return path.Join(*flagImgPathPrefix, fname)
+		return s
 	})
 
 	if rerr != nil {
@@ -101,6 +109,38 @@ func (item *Item) ImageToLocal(dir string) error {
 	item.Body = body
 
 	return nil
+}
+
+type imageNameParam struct {
+	itemID string
+	dir string
+	count int
+	name string
+}
+
+func imageName(p imageNameParam) (string, error) {
+	ext := path.Ext(p.name)
+	fname := fmt.Sprintf("qiita-%s-%d%s", p.itemID, p.count, ext)
+	f, err := os.Create(filepath.Join(p.dir, fname))
+	if err != nil {
+		return p.name, err
+	}
+
+	resp, err := http.Get(p.name)
+	if err != nil {
+		return p.name, err
+	}
+	defer resp.Body.Close()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return p.name, err
+	}
+
+	if err := f.Close(); err != nil {
+		return p.name, err
+	}
+
+	return path.Join(*flagImgPathPrefix, fname), nil
 }
 
 func main() {
