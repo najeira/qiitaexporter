@@ -24,6 +24,7 @@ var (
 	flagTmplFile      = flag.String("template", "", "template file")
 
 	imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
+	quoteReplacer = strings.NewReplacer("\"", "\\\"")
 )
 
 type Tag struct {
@@ -156,22 +157,26 @@ func download100(page int) (hasNext bool, rerr error) {
 	}
 
 	for i := range items {
-		if items[i].Private {
+		item := items[i]
+
+		if item.Private {
 			continue
 		}
 
-		if err := items[i].ImageToLocal(imgdir); err != nil {
+		if err := item.ImageToLocal(imgdir); err != nil {
 			return false, err
 		}
 
-		fname := fmt.Sprintf("%s-qiita-%s.ja.md", items[i].Date(), items[i].ID)
-		fmt.Print(items[i].Title, "....")
+		fname := fmt.Sprintf("%s-qiita-%s.ja.md", item.Date(), item.ID)
+		fmt.Print(item.Title, "....")
 		f, err := os.Create(filepath.Join(*flagPostDir, fname))
 		if err != nil {
 			return false, err
 		}
 
-		if err := tmpl.Execute(f, items[i]); err != nil {
+		item.Title = quoteReplacer.Replace(item.Title)
+
+		if err := tmpl.Execute(f, item); err != nil {
 			return false, err
 		}
 
