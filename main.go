@@ -19,8 +19,8 @@ import (
 
 var (
 	flagImgPathPrefix = flag.String("imgprefix", "/images/", "prefix of image path")
-	flagImgDir        = flag.String("imgdir", "images", "image dir")
-	flagPostDir       = flag.String("postdir", "posts", "posts dir")
+	flagImgDir        = flag.String("imgdir", "static/images", "image dir")
+	flagPostDir       = flag.String("postdir", "content/posts", "posts dir")
 	flagTmplFile      = flag.String("template", "", "template file")
 
 	imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
