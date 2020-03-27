@@ -47,7 +47,9 @@ func (img *Image) download(dir string) {
 	}
 }
 
-func convertImages(body string) (string, []Image) {
+func convertImages(dir, body string) (string, []Image) {
+	imagePath := strings.TrimPrefix(dir, "content/")
+
 	imgs := make([]Image, 0)
 	count := 0
 	body = imgRegexp.ReplaceAllStringFunc(body, func(s string) string {
@@ -65,7 +67,7 @@ func convertImages(body string) (string, []Image) {
 
 		// 記事ごとに別のディレクトリなので相対パス表記する
 		//imgPath := path.Join(p.imagePrefix, img.FileName)
-		imgPath := fmt.Sprintf("%s", img.FileName)
+		imgPath := fmt.Sprintf("/%s/%s", imagePath, img.FileName)
 
 		imgTag := fmt.Sprintf("![%s](%s)", img.Alt, imgPath)
 		return imgTag

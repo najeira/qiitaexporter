@@ -50,7 +50,7 @@ func (item *Item) Date() string {
 }
 
 func (item *Item) ImageToLocal(dir string) error {
-	body, imgs := convertImages(item.Body)
+	body, imgs := convertImages(dir, item.Body)
 
 	for _, img := range imgs {
 		img.download(dir)
@@ -126,15 +126,14 @@ func download100(page int) (hasNext bool, rerr error) {
 			return false, err
 		}
 
-		imgPath := filepath.Join(*flagPostDir, dirName)
-		if err := item.ImageToLocal(imgPath); err != nil {
+		if err := item.ImageToLocal(dirPath); err != nil {
 			return false, err
 		}
 
 		item.Title = quoteReplacer.Replace(item.Title)
 
 		//fname := fmt.Sprintf("%s-qiita-%s.ja.md", item.Date(), item.ID)
-		docPath := filepath.Join(*flagPostDir, dirName, "_index.md")
+		docPath := filepath.Join(*flagPostDir, dirName, "index.md")
 
 		// start print
 		fmt.Print(item.Title, "...")
