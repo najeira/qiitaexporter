@@ -15,13 +15,8 @@ import (
 )
 
 var (
-	flagImgPathPrefix = flag.String("imgprefix", "/images/", "prefix of image path")
-	flagImgDir        = flag.String("imgdir", "static/images", "image dir")
-	flagPostDir       = flag.String("postdir", "content/posts", "posts dir")
-	flagTmplFile      = flag.String("template", "", "template file")
-
-	//imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
-	//imgRegexp2 = regexp.MustCompile(`https://qiita-user-contents\.imgix\.net/https%3A%2F%2Fqiita-image-store\.s3\.amazonaws\.com.+`)
+	flagPostDir  = flag.String("postdir", "content/posts", "posts dir")
+	flagTmplFile = flag.String("template", "", "template file")
 
 	quoteReplacer = strings.NewReplacer("\"", "\\\"")
 )
@@ -55,11 +50,7 @@ func (item *Item) Date() string {
 }
 
 func (item *Item) ImageToLocal(dir string) error {
-	body, imgs := convertImages(convertImagesParam{
-		itemID:      item.ID,
-		body:        item.Body,
-		imagePrefix: *flagImgPathPrefix,
-	})
+	body, imgs := convertImages(item.Body)
 
 	for _, img := range imgs {
 		img.download(dir)
@@ -121,10 +112,6 @@ func download100(page int) (hasNext bool, rerr error) {
 		return false, err
 	}
 
-	if err := os.MkdirAll(*flagImgDir, 0777); err != nil {
-		return false, err
-	}
-
 	for i := range items {
 		item := items[i]
 
@@ -132,18 +119,30 @@ func download100(page int) (hasNext bool, rerr error) {
 			continue
 		}
 
-		if err := item.ImageToLocal(*flagImgDir); err != nil {
+		// 関連画像をまとめるためにディレクトリを作っていく
+		dirName := fmt.Sprintf("%s-qiita-%s", item.Date(), item.ID)
+		dirPath := filepath.Join(*flagPostDir, dirName)
+		if err := os.MkdirAll(dirPath, 0777); err != nil {
 			return false, err
 		}
 
-		fname := fmt.Sprintf("%s-qiita-%s.ja.md", item.Date(), item.ID)
-		fmt.Print(item.Title, "....")
-		f, err := os.Create(filepath.Join(*flagPostDir, fname))
-		if err != nil {
+		imgPath := filepath.Join(*flagPostDir, dirName)
+		if err := item.ImageToLocal(imgPath); err != nil {
 			return false, err
 		}
 
 		item.Title = quoteReplacer.Replace(item.Title)
+
+		//fname := fmt.Sprintf("%s-qiita-%s.ja.md", item.Date(), item.ID)
+		docPath := filepath.Join(*flagPostDir, dirName, "_index.md")
+
+		// start print
+		fmt.Print(item.Title, "...")
+
+		f, err := os.Create(docPath)
+		if err != nil {
+			return false, err
+		}
 
 		if err := tmpl.Execute(f, item); err != nil {
 			return false, err
@@ -153,6 +152,7 @@ func download100(page int) (hasNext bool, rerr error) {
 			return false, err
 		}
 
+		// end print
 		fmt.Println("done")
 	}
 

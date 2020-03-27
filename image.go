@@ -47,26 +47,26 @@ func (img *Image) download(dir string) {
 	}
 }
 
-type convertImagesParam struct {
-	itemID string
-	imagePrefix string
-	body string
-}
-
-func convertImages(p convertImagesParam) (string, []Image) {
+func convertImages(body string) (string, []Image) {
 	imgs := make([]Image, 0)
 	count := 0
-	body := imgRegexp.ReplaceAllStringFunc(p.body, func(s string) string {
+	body = imgRegexp.ReplaceAllStringFunc(body, func(s string) string {
 		count++
 
 		img := parseImageTag(s)
 
 		ext := path.Ext(img.Src)
-		img.FileName = fmt.Sprintf("qiita-%s-%d%s", p.itemID, count, ext)
+
+		// 記事ごとに別のディレクトリなのでカウントだけでよい
+		//img.FileName = fmt.Sprintf("qiita-%s-%d%s", p.itemID, count, ext)
+		img.FileName = fmt.Sprintf("%d%s", count, ext)
 
 		imgs = append(imgs, img)
 
-		imgPath := path.Join(p.imagePrefix, img.FileName)
+		// 記事ごとに別のディレクトリなので相対パス表記する
+		//imgPath := path.Join(p.imagePrefix, img.FileName)
+		imgPath := fmt.Sprintf("%s", img.FileName)
+
 		imgTag := fmt.Sprintf("![%s](%s)", img.Alt, imgPath)
 		return imgTag
 	})
@@ -157,17 +157,4 @@ func drainAttributeValue(r *strings.Reader, end rune) string {
 		}
 		value.WriteRune(ch)
 	}
-}
-
-type imageNameParam struct {
-	itemID string
-	dir string
-	count int
-	name string
-}
-
-func imageName(p imageNameParam) (string, error) {
-	ext := path.Ext(p.name)
-	fname := fmt.Sprintf("qiita-%s-%d%s", p.itemID, p.count, ext)
-	return path.Join(*flagImgPathPrefix, fname), nil
 }
