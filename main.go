@@ -49,8 +49,8 @@ func (item *Item) Date() string {
 	return item.CreatedAt.Format("2006-01-02")
 }
 
-func (item *Item) ImageToLocal(dir string) error {
-	body, imgs := convertImages(dir, item.Body)
+func (item *Item) ImageToLocal(dir, slug string) error {
+	body, imgs := convertImages(slug, item.Body)
 
 	for _, img := range imgs {
 		img.download(dir)
@@ -120,13 +120,14 @@ func download100(page int) (hasNext bool, rerr error) {
 		}
 
 		// 関連画像をまとめるためにディレクトリを作っていく
-		dirName := fmt.Sprintf("%s-qiita-%s", item.Date(), item.ID)
+		slug := fmt.Sprintf("qiita-%s", item.ID)
+		dirName := fmt.Sprintf("%s-%s", item.Date(), slug)
 		dirPath := filepath.Join(*flagPostDir, dirName)
 		if err := os.MkdirAll(dirPath, 0777); err != nil {
 			return false, err
 		}
 
-		if err := item.ImageToLocal(dirPath); err != nil {
+		if err := item.ImageToLocal(dirPath, slug); err != nil {
 			return false, err
 		}
 
