@@ -5,12 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -23,8 +20,8 @@ var (
 	flagPostDir       = flag.String("postdir", "content/posts", "posts dir")
 	flagTmplFile      = flag.String("template", "", "template file")
 
-	imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
-	imgRegexp2 = regexp.MustCompile(`https://qiita-user-contents\.imgix\.net/https%3A%2F%2Fqiita-image-store\.s3\.amazonaws\.com.+`)
+	//imgRegexp = regexp.MustCompile(`https://qiita-image-store\.s3\.amazonaws\.com/.+\.png`)
+	//imgRegexp2 = regexp.MustCompile(`https://qiita-user-contents\.imgix\.net/https%3A%2F%2Fqiita-image-store\.s3\.amazonaws\.com.+`)
 
 	quoteReplacer = strings.NewReplacer("\"", "\\\"")
 )
@@ -58,89 +55,19 @@ func (item *Item) Date() string {
 }
 
 func (item *Item) ImageToLocal(dir string) error {
-	var (
-		rerr  error
-		count int
-	)
-
-	// qiita-user-contents.imgix.netのほうを先にダウンロードする
-	body := imgRegexp2.ReplaceAllStringFunc(item.Body, func(s string) string {
-		if rerr != nil {
-			return s
-		}
-
-		count++
-
-		s, err := imageName(imageNameParam{
-			itemID: item.ID,
-			dir:    dir,
-			count:  count,
-			name:   s,
-		})
-		if err != nil {
-			rerr = err
-		}
-		return s
+	body, imgs := convertImages(convertImagesParam{
+		itemID:      item.ID,
+		body:        item.Body,
+		imagePrefix: *flagImgPathPrefix,
 	})
 
-	body = imgRegexp.ReplaceAllStringFunc(body, func(s string) string {
-		if rerr != nil {
-			return s
-		}
-
-		count++
-
-		s, err := imageName(imageNameParam{
-			itemID: item.ID,
-			dir:    dir,
-			count:  count,
-			name:   s,
-		})
-		if err != nil {
-			rerr = err
-		}
-		return s
-	})
-
-	if rerr != nil {
-		return rerr
+	for _, img := range imgs {
+		img.download(dir)
 	}
 
 	item.Body = body
 
 	return nil
-}
-
-type imageNameParam struct {
-	itemID string
-	dir string
-	count int
-	name string
-}
-
-func imageName(p imageNameParam) (string, error) {
-	ext := path.Ext(p.name)
-	fname := fmt.Sprintf("qiita-%s-%d%s", p.itemID, p.count, ext)
-	f, err := os.Create(filepath.Join(p.dir, fname))
-	if err != nil {
-		return p.name, err
-	}
-
-	resp, err := http.Get(p.name)
-	if err != nil {
-		return p.name, err
-	}
-	defer resp.Body.Close()
-
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		return p.name, err
-	}
-
-	if err := f.Close(); err != nil {
-		return p.name, err
-	}
-
-	return path.Join(*flagImgPathPrefix, fname), nil
 }
 
 func main() {
@@ -169,7 +96,6 @@ func main() {
 }
 
 func download100(page int) (hasNext bool, rerr error) {
-
 	url := fmt.Sprintf("https://qiita.com/api/v2/authenticated_user/items?page=%d&per_page=20", page)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -191,8 +117,11 @@ func download100(page int) (hasNext bool, rerr error) {
 		return false, err
 	}
 
-	imgdir := filepath.Join(*flagPostDir, *flagImgDir)
-	if err := os.MkdirAll(imgdir, 0777); err != nil {
+	if err := os.MkdirAll(*flagPostDir, 0777); err != nil {
+		return false, err
+	}
+
+	if err := os.MkdirAll(*flagImgDir, 0777); err != nil {
 		return false, err
 	}
 
@@ -203,7 +132,7 @@ func download100(page int) (hasNext bool, rerr error) {
 			continue
 		}
 
-		if err := item.ImageToLocal(imgdir); err != nil {
+		if err := item.ImageToLocal(*flagImgDir); err != nil {
 			return false, err
 		}
 
