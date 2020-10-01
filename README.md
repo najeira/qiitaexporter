@@ -5,7 +5,7 @@ Qiitaから記事をエクスポートするツールです。
 ## インストール
 
 ```sh
-$ go get -u github.com/tenntenn/qiitaexporter
+$ go get -u github.com/najeira/qiitaexporter
 ```
 
 ## アクセストークンの取得
